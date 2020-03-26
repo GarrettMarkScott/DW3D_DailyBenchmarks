@@ -1,0 +1,3 @@
+*.ini
+*.ipynb_checkpoints*
+*pycache*
