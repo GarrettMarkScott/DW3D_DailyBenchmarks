@@ -105,7 +105,7 @@ msg['From'] = e_user
 msg['To'] = 'garrettpythontest@gmail.com'
 
 
-# To add an attachment is just add a MIMEBase object to read a picture locally.
+# To add an attachment just add a MIMEBase object to read a picture locally.
 with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'AvgClientSessions.png'), 'rb') as f:
     # set attachment mime and file name, the image type is png
     mime = MIMEBase('image', 'png', filename='AvgClientSessions.png')
