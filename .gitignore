@@ -1,3 +1,5 @@
 *.ini
 *.ipynb_checkpoints*
 *pycache*
+*lambda*
+*.png
