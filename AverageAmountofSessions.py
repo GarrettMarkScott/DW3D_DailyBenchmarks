@@ -81,7 +81,7 @@ plt.xlabel('Date')
 plt.ylabel('Daily Average Sessions')
 plt.savefig(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'AvgClientSessions.png'))
 
-#Importing gmail credentials use GmailLogin.ini
+#Importing gmail credentials using GmailLogin.ini
 
 email_ini_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'GmailLogin.ini')
 print("The email ini path is looking here: " + email_ini_path)
