@@ -81,7 +81,7 @@ plt.xlabel('Date')
 plt.ylabel('Daily Average Sessions')
 plt.savefig(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'AvgClientSessions.png'))
 
-#Importing gmail credentials use GmailLogin.ini
+#Importing gmail credentials using GmailLogin.ini
 
 email_ini_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'GmailLogin.ini')
 print("The email ini path is looking here: " + email_ini_path)
@@ -105,8 +105,8 @@ msg['From'] = e_user
 msg['To'] = 'garrettpythontest@gmail.com'
 
 
-# to add an attachment is just add a MIMEBase object to read a picture locally.
-with open('AvgClientSessions.png', 'rb') as f:
+# To add an attachment is just add a MIMEBase object to read a picture locally.
+with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'AvgClientSessions.png'), 'rb') as f:
     # set attachment mime and file name, the image type is png
     mime = MIMEBase('image', 'png', filename='AvgClientSessions.png')
     # add required header data:
