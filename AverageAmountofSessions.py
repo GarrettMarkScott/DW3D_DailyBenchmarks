@@ -1,4 +1,4 @@
-
+############################# IMPORTING LIBRARIES ##############################
 import sqlalchemy as db
 import matplotlib as mpl
 import pandas as pd
@@ -7,12 +7,10 @@ import smtplib
 import configparser
 import path, os
 from pandas.plotting import register_matplotlib_converters
-
-
-
 pd.plotting.register_matplotlib_converters()
 
 
+############################ SQL QUERY 1 ######################################
 SQL = '''
     SELECT
         date,
@@ -23,7 +21,7 @@ SQL = '''
     ORDER BY Date DESC
     '''
 
-
+########################  OBTAINING DATABASE CREDENTIALS  ######################
 db_config = configparser.ConfigParser()
 db_ini_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'dwdbconfig.ini')
 print("The db ini path is looking here: " + db_ini_path)
@@ -35,21 +33,15 @@ db_pass = db_config['mysql']['password']
 db_port = db_config['mysql']['port']
 
 
-
+#################### SETTING SQLALCHEMY CONNECTION #############################
 sql_alc_string = 'mysql+pymysql://'+db_user+':'+db_pass+'@'+db_host+':'+db_port+'/'+db_database
-print(sql_alc_string)
-
-
-
+print("The SQL Alchemy Call: " + sql_alc_string)
 engine = db.create_engine(sql_alc_string)
-
-
-
 connection = engine.connect()
 metadata = db.MetaData()
 
 
-
+################## RETRIEVING SQL DATA TO DATAFRAME ############################
 df = pd.read_sql_query(SQL, engine)
 df.set_index('Date', inplace = True)
 df.index = pd.to_datetime(df.index)
@@ -57,32 +49,36 @@ raw_count = len(df.index)
 print(raw_count)
 
 
-plt.figure(figsize=(20,30))
-plt.plot_date(x=df.index, y=df['Sessions']);
+##################### OPTIONAL SCATTERPLOT OF DATA ##############################
+#plt.figure(figsize=(20,30))
+#plt.plot_date(x=df.index, y=df['Sessions']);
 
 
+################## OBTAINING STATISTICAL SUMMARY DATA ##########################
 std = df.std(skipna=True)[0]
 mean = df['Sessions'].mean()
 upper = mean+std
 lower = mean-std
 
 
+################ REDUCING DATAFRAME TO 1 STD OF MEAN ###########################
 df = df[df['Sessions'].between(lower,upper)]
 rows_in_1_std = len(df.index)
 print(str(round(rows_in_1_std/raw_count*100,1))+"% of the data is represented below after excluding data greater than 1 Standard Deviation from the mean")
 
 
-weekly_totals = df.resample('W').mean()
 
-#Saving Weekly Session Averages to Local Machine
+#########  SAVING WEEKLY SESSION AVERAGES TO LOCAL MACHINE #####################
+weekly_totals = df.resample('W').mean()
 plt.figure(figsize=(20,10))
 plt.plot(weekly_totals.index, weekly_totals['Sessions'])
 plt.xlabel('Date')
 plt.ylabel('Daily Average Sessions')
 plt.savefig(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'AvgClientSessions.png'))
 
-#Importing gmail credentials using GmailLogin.ini
+################## OB
 
+###################### OBTAINING GMAIL CREDENTIALS #############################
 email_ini_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'GmailLogin.ini')
 print("The email ini path is looking here: " + email_ini_path)
 email_config = configparser.ConfigParser()
@@ -91,7 +87,7 @@ e_user = email_config['Gmail']['user']
 e_pass = email_config['Gmail']['password']
 
 
-#Importing and sending email
+############################# SENDING EMAILS ###################################
 import smtplib, ssl
 from email import encoders
 from email.mime.text import MIMEText
