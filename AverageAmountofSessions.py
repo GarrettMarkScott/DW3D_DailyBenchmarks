@@ -1,24 +1,91 @@
 ############################# IMPORTING LIBRARIES ##############################
 import sqlalchemy as db
 import matplotlib as mpl
+from matplotlib import style
+style.use('dealerworldblue')
 import pandas as pd
 import matplotlib.pyplot as plt
 import smtplib
 import configparser
+import timeit
 import path, os
 from pandas.plotting import register_matplotlib_converters
 pd.plotting.register_matplotlib_converters()
 
 
-############################ SQL QUERY 1 ######################################
+######################## GA SESSION AND EVENT QUERY  ###########################
+# Imports 90 days worth of conversational conversions from clients websites
+
 SQL = '''
     SELECT
-        date,
-        SUM(sessions) as 'Sessions',
-        DealerName
-    FROM `data_5d67cfa96d8c0`.`GA User Metrics (65)` AS sessions
-    GROUP BY Date, DealerName
-    ORDER BY Date DESC
+    	Sessions.dealerID,
+    	Sessions.DealerName,
+        Sessions.`date`,
+        SUM(Sessions.Sessions) AS `Sessions`,
+        TotalUniqueGoals.TotalUniqueGoals,
+        FormTotals.TotalForms,
+        CallTotals.TotalCalls,
+        ChatTotals.TotalChats,
+        FormTotals.TotalForms/SUM(Sessions.Sessions) AS `FormConversionRate`,
+        CallTotals.TotalCalls/SUM(Sessions.Sessions) AS `CallConversionRate`,
+        ChatTotals.TotalChats/SUM(Sessions.Sessions) AS `ChatConversionRate`,
+        TotalUniqueGoals.TotalUniqueGoals/SUM(Sessions.Sessions) AS `TotalConversionRate`
+
+    FROM data_5d67cfa96d8c0.`GA User Metrics (65)` as Sessions
+
+    LEFT JOIN (
+    	SELECT
+    		events.DealerID,
+    		events.DealerName,
+    		SUM(events.`Unique Events`) as TotalForms,
+    		events.`date` as EventDay
+    	FROM data_5d67cfa96d8c0.`GA Events (64)` AS events
+    		WHERE events.TrackedItemName IS NOT NULL
+    		AND events.ConversationType = "form"
+    		/* AND events.`date` > 20200301 */
+    	GROUP BY events.DealerName, events.`date`) AS FormTotals
+    ON FormTotals.DealerID = Sessions.DealerID AND FormTotals.EventDay = Sessions.`Date`
+
+    LEFT JOIN (
+    	SELECT
+    		events.DealerID,
+    		events.DealerName,
+    		SUM(events.`Unique Events`) as TotalCalls,
+    		events.`date` as EventDay
+    	FROM data_5d67cfa96d8c0.`GA Events (64)` AS events
+    		WHERE events.TrackedItemName IS NOT NULL
+    		AND events.ConversationType = "call"
+    		/* AND events.`date` > 20200301 */
+    	GROUP BY events.DealerName, events.`date`) AS CallTotals
+    ON CallTotals.DealerID = Sessions.DealerID AND CallTotals.EventDay = Sessions.`Date`
+
+    LEFT JOIN (
+    	SELECT
+    		events.DealerID,
+    		events.DealerName,
+    		SUM(events.`Unique Events`) as TotalUniqueGoals,
+    		events.`date` as EventDay
+    	FROM data_5d67cfa96d8c0.`GA Events (64)` AS events
+    		WHERE events.TrackedItemName IS NOT NULL
+    		/* AND events.`date` > 20200301 */
+    	GROUP BY events.DealerName, events.`date`) AS TotalUniqueGoals
+    ON TotalUniqueGoals.DealerID = Sessions.DealerID AND TotalUniqueGoals.EventDay = Sessions.`Date`
+
+    LEFT JOIN (
+    	SELECT
+    		events.DealerID,
+    		events.DealerName,
+    		SUM(events.`Unique Events`) as TotalChats,
+    		events.`date` as EventDay
+    	FROM data_5d67cfa96d8c0.`GA Events (64)` AS events
+    		WHERE events.TrackedItemName IS NOT NULL
+    		AND events.ConversationType = "chat"
+    		/* AND events.`date` > 20200301 */
+    	GROUP BY events.DealerName, events.`date`) AS ChatTotals
+    ON ChatTotals.DealerID = Sessions.DealerID AND ChatTotals.EventDay = Sessions.`Date`
+
+    WHERE Sessions.`date` BETWEEN CURDATE() - INTERVAL 13 MONTH AND CURDATE()
+    GROUP BY Sessions.DealerID, Sessions.`Date`
     '''
 
 ########################  OBTAINING DATABASE CREDENTIALS  ######################
@@ -41,7 +108,8 @@ connection = engine.connect()
 metadata = db.MetaData()
 
 
-################## RETRIEVING SQL DATA TO DATAFRAME ############################
+############## RETRIEVING SQL GA SESSION AND EVENT DATA TO DATAFRAME ###########
+
 df = pd.read_sql_query(SQL, engine)
 df.set_index('Date', inplace = True)
 df.index = pd.to_datetime(df.index)
@@ -54,29 +122,89 @@ print(raw_count)
 #plt.plot_date(x=df.index, y=df['Sessions']);
 
 
-################## OBTAINING STATISTICAL SUMMARY DATA ##########################
-std = df.std(skipna=True)[0]
+##################### OBTAINING STD OF SESSIONS DATA ###########################
+session_std = df.std(skipna=True)[0] #The argument calls the second column
+print('Session STD: '+str(session_std))
 mean = df['Sessions'].mean()
-upper = mean+std
-lower = mean-std
+upper = mean+session_std
+lower = mean-session_std
 
 
-################ REDUCING DATAFRAME TO 1 STD OF MEAN ###########################
-df = df[df['Sessions'].between(lower,upper)]
-rows_in_1_std = len(df.index)
-print(str(round(rows_in_1_std/raw_count*100,1))+"% of the data is represented below after excluding data greater than 1 Standard Deviation from the mean")
-
+############# CREATING SESSIONS DATAFRAME THAT IS 1 STD OF MEAN ################
+df_sessions = df[df['Sessions'].between(lower,upper)]
+rows_in_1_std = len(df_sessions.index)
+print(str(round(rows_in_1_std/raw_count*100,1))+"% of the session data is represented below after excluding data greater than 1 Standard Deviation from the mean")
 
 
 #########  SAVING WEEKLY SESSION AVERAGES TO LOCAL MACHINE #####################
-weekly_totals = df.resample('W').mean()
+weekly_totals = df_sessions.resample('W').mean()
 plt.figure(figsize=(20,10))
 plt.plot(weekly_totals.index, weekly_totals['Sessions'])
 plt.xlabel('Date')
-plt.ylabel('Daily Average Sessions')
+plt.ylabel('Weekly Average Sessions')
 plt.savefig(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'AvgClientSessions.png'))
 
-################## OB
+
+
+################## OBTAINING STD OF CONVERSION RATE DATA #######################
+conv_std = df.std(skipna=True)[8]
+mean = df['TotalConversionRate'].mean()
+upper = mean+conv_std*2
+lower = mean-conv_std*2
+
+
+########## CREATING CONVERSION RATE DATAFRAME THAT IS 1 STD OF MEAN ############
+df_conv = df[df['TotalConversionRate'].between(lower,upper)]
+rows_in_1_std = len(df_conv.index)
+print(str(round(rows_in_1_std/raw_count*100,1))+"% of the data is represented below after excluding data greater than 2 Standard Deviation from the mean")
+
+
+
+########  SAVING WEEKLY CONVERSION RATE AVERAGES TO LOCAL MACHINE ##############
+weeklyrates = []
+
+for client in df_conv['DealerName'].unique():
+    temp = df_conv[df_conv['DealerName'] == client]['TotalConversionRate'].resample('W').mean() #NOT STATISTACALLY ACCURATE YET, NEED TO SUM CONVESIONS OVER SESSIONS
+    weeklyrates.append(temp)
+
+weeklyrates = pd.concat(weeklyrates)
+
+plt.figure(figsize=(20,10))
+plt.xlabel('Conversion Rate')
+plt.ylabel('Frequency of Dataset')
+plt.hist(weeklyrates.dropna(), bins='auto')
+plt.title('Weekly Conversion Frequencies');
+plt.savefig(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'ClientConversionRateHistogram.png'))
+
+######################### SEARCH CONSOLE DATA QUERY ###########################
+#Importing SQLalchemy text is used to handle the LIKE statement, without it it does not work.
+#There are articles showing this can be done with {} and .format
+from sqlalchemy import create_engine, text
+SQL = '''
+    SELECT DISTINCT
+    gsc.Date,
+    gsc.DealerID,
+    gsc.DealerName,
+    SUM(gsc.Clicks) AS TotalClicks,
+    gsc.`query`,
+    gsc.`page`
+    FROM data_5d67cfa96d8c0.`Google Search Console (70)` AS gsc
+    JOIN `data_5d67cfa96d8c0`.`Client Accounts (22)` as accounts
+    ON gsc.DealerID = accounts.DealerID
+    WHERE accounts.`TerminationDate` IS NULL
+    AND gsc.Clicks > 0
+    AND gsc.`query` NOT LIKE CONCAT("%",accounts.dealername,"%")
+    AND gsc.`query` NOT REGEXP CONCAT("^",accounts.`GSCBrandedExclusionRegEx`,"$")
+    GROUP BY gsc.DealerName, gsc.`query`,gsc.`page`
+    '''
+
+
+############## RETRIEVING GOOGLE SEARCH CONSOLE DATA TO DATAFRAME ##############
+df_gsc = pd.read_sql_query(text(SQL), engine)
+df_gsc.set_index('Date', inplace = True)
+df_gsc.index = pd.to_datetime(df_gsc.index)
+raw_count = len(df_gsc.index)
+df_gsc['TotalClicks'] = df_gsc['TotalClicks'].astype(int)
 
 ###################### OBTAINING GMAIL CREDENTIALS #############################
 email_ini_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'GmailLogin.ini')
