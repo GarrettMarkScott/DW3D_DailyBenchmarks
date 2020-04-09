@@ -156,7 +156,7 @@ lower = mean-conv_std*2
 ########## CREATING CONVERSION RATE DATAFRAME THAT IS 1 STD OF MEAN ############
 df_conv = df[df['TotalConversionRate'].between(lower,upper)]
 rows_in_1_std = len(df_conv.index)
-print(str(round(rows_in_1_std/raw_count*100,1))+"% of the data is represented below after excluding data greater than 2 Standard Deviation from the mean")
+print(str(round(rows_in_1_std/raw_count*100,1))+"% of the conversion rate data is represented below after excluding data greater than 2 Standard Deviation from the mean")
 
 
 
@@ -181,23 +181,25 @@ plt.savefig(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'ClientCon
 #There are articles showing this can be done with {} and .format
 from sqlalchemy import create_engine, text
 SQL = '''
-    SELECT DISTINCT
+/* OBJECTIVE: Sum of Clicks that were not searching for the dealer by name */
+SELECT DISTINCT
     gsc.Date,
     gsc.DealerID,
     gsc.DealerName,
     SUM(gsc.Clicks) AS TotalClicks,
     gsc.`query`,
-    gsc.`page`
-    FROM data_5d67cfa96d8c0.`Google Search Console (70)` AS gsc
-    JOIN `data_5d67cfa96d8c0`.`Client Accounts (22)` as accounts
-    ON gsc.DealerID = accounts.DealerID
-    WHERE accounts.`TerminationDate` IS NULL
-    AND gsc.Clicks > 0
-    AND gsc.`query` NOT LIKE CONCAT("%",accounts.dealername,"%")
-    AND gsc.`query` NOT REGEXP CONCAT("^",accounts.`GSCBrandedExclusionRegEx`,"$")
-    GROUP BY gsc.DealerName, gsc.`query`,gsc.`page`
-    '''
+    gsc.`page` ,
+    (CASE
+    WHEN (gsc.`query` NOT LIKE CONCAT("%",accounts.dealername,"%") AND gsc.`query` NOT REGEXP CONCAT("^",accounts.`GSCBrandedExclusionRegEx`,"$")) THEN "nonbranded"
+    WHEN (gsc.`query` LIKE CONCAT("%",accounts.dealername,"%") OR gsc.`query` REGEXP CONCAT("^",accounts.`GSCBrandedExclusionRegEx`,"$")) THEN "branded"
+    ELSE "unknown" END) AS Branded
 
+FROM data_5d67cfa96d8c0.`Google Search Console (70)` AS gsc
+JOIN `data_5d67cfa96d8c0`.`Client Accounts (22)` as accounts ON gsc.DealerID = accounts.DealerID
+WHERE accounts.`TerminationDate` IS NULL AND gsc.Clicks > 0
+GROUP BY gsc.DealerName, gsc.`query`,gsc.`page`
+
+    '''
 
 ############## RETRIEVING GOOGLE SEARCH CONSOLE DATA TO DATAFRAME ##############
 df_gsc = pd.read_sql_query(text(SQL), engine)
@@ -205,6 +207,43 @@ df_gsc.set_index('Date', inplace = True)
 df_gsc.index = pd.to_datetime(df_gsc.index)
 raw_count = len(df_gsc.index)
 df_gsc['TotalClicks'] = df_gsc['TotalClicks'].astype(int)
+#df_gsc.sample(10)
+
+################## CLEANING THE GOOGLE SEARCH CONSOLE DATA #####################
+#Removing dates before January 1st as there was a very apparent issue in the data collection
+gsc_start_date = '2020-01-01' #Note you can select variables in query with @ symbol
+df_gsc = df_gsc.query('index >= @gsc_start_date')
+
+#Plots the original data, note that it calls a second image renderb
+#plt.figure(figsize=(20,30))
+#plt.plot_date(x=df_gsc.index, y=df_gsc['TotalClicks'])
+
+std = df_gsc.std(skipna=True)[0]
+mean = df_gsc['TotalClicks'].mean()
+upper = mean+std*2
+lower = mean-std*2
+df_gsc = df_gsc[df_gsc['TotalClicks'].between(lower,upper)]
+rows_in_2_std = len(df_gsc.index)
+print(str(round(rows_in_2_std/raw_count*100,1))+"% of the search console data is represented below after excluding data greater than 2 Standard Deviation from the mean")
+
+#Plots the cleaned data
+#plt.figure(figsize=(20,30))
+#plt.plot_date(x=df_gsc.index, y=df_gsc['TotalClicks'])
+
+
+##################### CREATING WEEKLY SEARCH CONSOLE SUMS ######################
+weekly_branded_totals = df_gsc.query('Branded == "branded"').resample('W').sum()
+weekly_unbranded_totals = df_gsc.query('Branded == "nonbranded"').resample('W').sum()
+weekly_unknown_totals = df_gsc.query('Branded == "unknown"').resample('W').sum()
+
+
+##################### PLOT AND SAVE SEARCH CONSOLE DATA ########################
+plt.plot(weekly_branded_totals.index, weekly_branded_totals['TotalClicks'])
+plt.plot(weekly_unbranded_totals.index, weekly_unbranded_totals['TotalClicks'])
+plt.plot(weekly_unknown_totals.index, weekly_unknown_totals['TotalClicks']);
+#!!!!! BUG !!!!!!! - Can't save, keeps telling me datetime issue
+#plt.savefig('GoogleSearchConsoleTrends.png')
+
 
 ###################### OBTAINING GMAIL CREDENTIALS #############################
 email_ini_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'GmailLogin.ini')
@@ -244,7 +283,36 @@ with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'AvgClientSe
     # add MIMEBase object to MIMEMultipart object
     msg.attach(mime)
 
-msg.attach(MIMEText('<html><body><h1>Hello</h1>' +'<p><img src="cid:0"></p>' + '</body></html>', 'html', 'utf-8'))
+with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'GoogleSearchConsoleTrends.png'), 'rb') as f:
+    # set attachment mime and file name, the image type is png
+    mime2 = MIMEBase('image', 'png', filename='GoogleSearchConsoleTrends.png')
+    # add required header data:
+    mime2.add_header('Content-Disposition', 'attachment', filename='GoogleSearchConsoleTrends.png')
+    mime2.add_header('X-Attachment-Id', '1')
+    mime2.add_header('Content-ID', '<1>')
+    # read attachment file content into the MIMEBase object
+    mime2.set_payload(f.read())
+    # encode with base64
+    encoders.encode_base64(mime2)
+    # add MIMEBase object to MIMEMultipart object
+    msg.attach(mime2)
+
+with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'ClientConversionRateHistogram.png'), 'rb') as f:
+    # set attachment mime and file name, the image type is png
+    mime3 = MIMEBase('image', 'png', filename='ClientConversionRateHistogram.png')
+    # add required header data:
+    mime3.add_header('Content-Disposition', 'attachment', filename='ClientConversionRateHistogram.png')
+    mime3.add_header('X-Attachment-Id', '2')
+    mime3.add_header('Content-ID', '<2>')
+    # read attachment file content into the MIMEBase object
+    mime3.set_payload(f.read())
+    # encode with base64
+    encoders.encode_base64(mime3)
+    # add MIMEBase object to MIMEMultipart object
+    msg.attach(mime3)
+
+
+msg.attach(MIMEText('<html><body><h1>Hello</h1>' +'<p><img src="cid:0"><img src="cid:1"><img src="cid:2"></p>' + '</body></html>', 'html', 'utf-8'))
 
 email_conn = smtplib.SMTP('smtp.gmail.com',587)
 email_conn.ehlo()
