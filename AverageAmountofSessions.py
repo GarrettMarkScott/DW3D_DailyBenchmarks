@@ -138,12 +138,13 @@ print(str(round(rows_in_1_std/raw_count*100,1))+"% of the session data is repres
 
 #########  SAVING WEEKLY SESSION AVERAGES TO LOCAL MACHINE #####################
 weekly_totals = df_sessions.resample('W').mean()
-plt.figure(figsize=(20,10))
+plt.style.use('dealerworldblue')
+#plt.figure(figsize=(20,10))
 plt.plot(weekly_totals.index, weekly_totals['Sessions'])
 plt.xlabel('Date')
 plt.ylabel('Weekly Average Sessions')
 plt.savefig(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'AvgClientSessions.png'))
-
+plt.cla()
 
 
 ################## OBTAINING STD OF CONVERSION RATE DATA #######################
@@ -169,13 +170,13 @@ for client in df_conv['DealerName'].unique():
 
 weeklyrates = pd.concat(weeklyrates)
 
-plt.figure(figsize=(20,10))
+plt.style.use('dealerworldblue')
 plt.xlabel('Conversion Rate')
 plt.ylabel('Frequency of Dataset')
 plt.hist(weeklyrates.dropna(), bins='auto')
 plt.title('Weekly Conversion Frequencies');
 plt.savefig(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'ClientConversionRateHistogram.png'))
-
+plt.cla()
 ######################### SEARCH CONSOLE DATA QUERY ###########################
 #Importing SQLalchemy text is used to handle the LIKE statement, without it it does not work.
 #There are articles showing this can be done with {} and .format
@@ -238,11 +239,12 @@ weekly_unknown_totals = df_gsc.query('Branded == "unknown"').resample('W').sum()
 
 
 ##################### PLOT AND SAVE SEARCH CONSOLE DATA ########################
+plt.style.use('dealerworldblue')
 plt.plot(weekly_branded_totals.index, weekly_branded_totals['TotalClicks'])
 plt.plot(weekly_unbranded_totals.index, weekly_unbranded_totals['TotalClicks'])
 plt.plot(weekly_unknown_totals.index, weekly_unknown_totals['TotalClicks']);
 #!!!!! BUG !!!!!!! - Can't save, keeps telling me datetime issue
-#plt.savefig('GoogleSearchConsoleTrends.png')
+plt.savefig('GoogleSearchConsoleTrends.png')
 
 
 ###################### OBTAINING GMAIL CREDENTIALS #############################
