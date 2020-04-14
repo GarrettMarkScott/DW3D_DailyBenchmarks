@@ -171,6 +171,7 @@ for client in df_conv['DealerName'].unique():
 weeklyrates = pd.concat(weeklyrates)
 
 plt.style.use('dealerworldblue')
+plt.xticks(rotation=45)
 plt.xlabel('Conversion Rate')
 plt.ylabel('Frequency of Dataset')
 plt.hist(weeklyrates.dropna(), bins='auto')
@@ -240,12 +241,30 @@ weekly_unknown_totals = df_gsc.query('Branded == "unknown"').resample('W').sum()
 
 ##################### PLOT AND SAVE SEARCH CONSOLE DATA ########################
 plt.style.use('dealerworldblue')
+plt.xticks(rotation=45)
 plt.plot(weekly_branded_totals.index, weekly_branded_totals['TotalClicks'])
 plt.plot(weekly_unbranded_totals.index, weekly_unbranded_totals['TotalClicks'])
 plt.plot(weekly_unknown_totals.index, weekly_unknown_totals['TotalClicks']);
-#!!!!! BUG !!!!!!! - Can't save, keeps telling me datetime issue
-plt.savefig('GoogleSearchConsoleTrends.png')
+plt.savefig(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'GoogleSearchConsoleTrends.png'))
+plt.cla()
 
+##################### READ AND PLOT GOOGLE ADS PERFORMANCE #####################
+SQL = """
+    SELECT accounts.DealerName, perf.PerformanceScore, perf.`Real CTR` as SearchAdCTR
+    FROM `data_5d67cfa96d8c0`.`Account Performance:99` AS perf
+    JOIN `data_5d67cfa96d8c0`.`Client Accounts (22)` AS accounts ON perf.DealerId = accounts.DealerID
+    """
+
+df = pd.read_sql_query(SQL, engine)
+df.sort_values('PerformanceScore', ascending=True, inplace=True)
+
+fig = plt.figure()
+plt.barh(width=df.PerformanceScore, y=df.DealerName)
+plt.title('Google Ads Performance')
+fig.set_size_inches([8,16])
+plt.xlabel('Performance Score')
+plt.savefig(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'GoogleAdsPerformance.png'))
+plt.cla()
 
 ###################### OBTAINING GMAIL CREDENTIALS #############################
 email_ini_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'GmailLogin.ini')
@@ -284,6 +303,7 @@ with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'AvgClientSe
     encoders.encode_base64(mime)
     # add MIMEBase object to MIMEMultipart object
     msg.attach(mime)
+f.close()
 
 with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'GoogleSearchConsoleTrends.png'), 'rb') as f:
     # set attachment mime and file name, the image type is png
@@ -298,6 +318,7 @@ with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'GoogleSearc
     encoders.encode_base64(mime2)
     # add MIMEBase object to MIMEMultipart object
     msg.attach(mime2)
+f.close()
 
 with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'ClientConversionRateHistogram.png'), 'rb') as f:
     # set attachment mime and file name, the image type is png
@@ -312,9 +333,24 @@ with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'ClientConve
     encoders.encode_base64(mime3)
     # add MIMEBase object to MIMEMultipart object
     msg.attach(mime3)
+f.close()
 
+with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'GoogleAdsPerformance.png'), 'rb') as f:
+    # set attachment mime and file name, the image type is png
+    mime4 = MIMEBase('image', 'png', filename='GoogleAdsPerformance.png')
+    # add required header data:
+    mime4.add_header('Content-Disposition', 'attachment', filename='GoogleAdsPerformance.png')
+    mime4.add_header('X-Attachment-Id', '3')
+    mime4.add_header('Content-ID', '<3>')
+    # read attachment file content into the MIMEBase object
+    mime4.set_payload(f.read())
+    # encode with base64
+    encoders.encode_base64(mime4)
+    # add MIMEBase object to MIMEMultipart object
+    msg.attach(mime4)
+f.close()
 
-msg.attach(MIMEText('<html><body><h1>Hello</h1>' +'<p><img src="cid:0"><img src="cid:1"><img src="cid:2"></p>' + '</body></html>', 'html', 'utf-8'))
+msg.attach(MIMEText('<html><body><h1>Hello</h1>' +'<img src="cid:0"><img src="cid:1"><img src="cid:2"><p><img src="cid:3"></p>' + '</body></html>', 'html', 'utf-8'))
 
 email_conn = smtplib.SMTP('smtp.gmail.com',587)
 email_conn.ehlo()
