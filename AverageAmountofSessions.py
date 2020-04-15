@@ -352,7 +352,8 @@ with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'GoogleAdsPe
     msg.attach(mime4)
 f.close()
 
-email_content = codecs.open("email.html", 'r')
+
+email_content = codecs.open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'email.html'), 'r')
 #If format order gets confusing follow this https://www.w3schools.com/python/ref_string_format.asp
 email_content = email_content.read().format(std_sessions, std_gsc, num_conversion_instances, std_conversion_rates)
 print(email_content)
