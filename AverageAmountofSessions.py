@@ -9,6 +9,7 @@ import smtplib
 import configparser
 import timeit
 import path, os
+import codecs
 from pandas.plotting import register_matplotlib_converters
 pd.plotting.register_matplotlib_converters()
 
@@ -134,15 +135,15 @@ lower = mean-session_std
 df_sessions = df[df['Sessions'].between(lower,upper)]
 rows_in_1_std = len(df_sessions.index)
 print(str(round(rows_in_1_std/raw_count*100,1))+"% of the session data is represented below after excluding data greater than 1 Standard Deviation from the mean")
-
+std_sessions = str(round(rows_in_1_std/raw_count*100,1))
 
 #########  SAVING WEEKLY SESSION AVERAGES TO LOCAL MACHINE #####################
 weekly_totals = df_sessions.resample('W').mean()
 plt.style.use('dealerworldblue')
 #plt.figure(figsize=(20,10))
 plt.plot(weekly_totals.index, weekly_totals['Sessions'])
-plt.xlabel('Date')
-plt.ylabel('Weekly Average Sessions')
+plt.ylabel('Number of Daily Sessions')
+plt.xticks(rotation=45)
 plt.savefig(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'AvgClientSessions.png'))
 plt.cla()
 
@@ -156,9 +157,9 @@ lower = mean-conv_std*2
 
 ########## CREATING CONVERSION RATE DATAFRAME THAT IS 1 STD OF MEAN ############
 df_conv = df[df['TotalConversionRate'].between(lower,upper)]
-rows_in_1_std = len(df_conv.index)
-print(str(round(rows_in_1_std/raw_count*100,1))+"% of the conversion rate data is represented below after excluding data greater than 2 Standard Deviation from the mean")
-
+std_instances = len(df_conv.index)
+print(str(round(std_instances/raw_count*100,1))+"% of the conversion rate data is represented below after excluding data greater than 2 Standard Deviation from the mean")
+std_conversion_rates = str(round(std_instances/raw_count*100,1))
 
 
 ########  SAVING WEEKLY CONVERSION RATE AVERAGES TO LOCAL MACHINE ##############
@@ -169,13 +170,12 @@ for client in df_conv['DealerName'].unique():
     weeklyrates.append(temp)
 
 weeklyrates = pd.concat(weeklyrates)
+num_conversion_instances = str(len(weeklyrates))
+print('Weekly Rate Instances of Converstion Rate Is: '+num_conversion_instances)
 
 plt.style.use('dealerworldblue')
-plt.xticks(rotation=45)
-plt.xlabel('Conversion Rate')
 plt.ylabel('Frequency of Dataset')
 plt.hist(weeklyrates.dropna(), bins='auto')
-plt.title('Weekly Conversion Frequencies');
 plt.savefig(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'ClientConversionRateHistogram.png'))
 plt.cla()
 ######################### SEARCH CONSOLE DATA QUERY ###########################
@@ -227,6 +227,7 @@ lower = mean-std*2
 df_gsc = df_gsc[df_gsc['TotalClicks'].between(lower,upper)]
 rows_in_2_std = len(df_gsc.index)
 print(str(round(rows_in_2_std/raw_count*100,1))+"% of the search console data is represented below after excluding data greater than 2 Standard Deviation from the mean")
+std_gsc = str(round(rows_in_2_std/raw_count*100,1))
 
 #Plots the cleaned data
 #plt.figure(figsize=(20,30))
@@ -242,9 +243,11 @@ weekly_unknown_totals = df_gsc.query('Branded == "unknown"').resample('W').sum()
 ##################### PLOT AND SAVE SEARCH CONSOLE DATA ########################
 plt.style.use('dealerworldblue')
 plt.xticks(rotation=45)
-plt.plot(weekly_branded_totals.index, weekly_branded_totals['TotalClicks'])
-plt.plot(weekly_unbranded_totals.index, weekly_unbranded_totals['TotalClicks'])
-plt.plot(weekly_unknown_totals.index, weekly_unknown_totals['TotalClicks']);
+plt.ylabel('Sum of Weekly Clicks')
+plt.plot(weekly_branded_totals.index, weekly_branded_totals['TotalClicks'], label='Branded')
+plt.plot(weekly_unbranded_totals.index, weekly_unbranded_totals['TotalClicks'], label='Non-Branded')
+plt.plot(weekly_unknown_totals.index, weekly_unknown_totals['TotalClicks'], label='Uknown')
+plt.legend()
 plt.savefig(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'GoogleSearchConsoleTrends.png'))
 plt.cla()
 
@@ -260,8 +263,7 @@ df.sort_values('PerformanceScore', ascending=True, inplace=True)
 
 fig = plt.figure()
 plt.barh(width=df.PerformanceScore, y=df.DealerName)
-plt.title('Google Ads Performance')
-fig.set_size_inches([8,16])
+fig.set_size_inches([8,10])
 plt.xlabel('Performance Score')
 plt.savefig(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'GoogleAdsPerformance.png'))
 plt.cla()
@@ -350,7 +352,18 @@ with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 'GoogleAdsPe
     msg.attach(mime4)
 f.close()
 
-msg.attach(MIMEText('<html><body><h1>Hello</h1>' +'<img src="cid:0"><img src="cid:1"><img src="cid:2"><p><img src="cid:3"></p>' + '</body></html>', 'html', 'utf-8'))
+email_content = codecs.open("email.html", 'r')
+#If format order gets confusing follow this https://www.w3schools.com/python/ref_string_format.asp
+email_content = email_content.read().format(std_sessions, std_gsc, num_conversion_instances, std_conversion_rates)
+print(email_content)
+
+msg.attach(MIMEText(email_content, 'html', 'utf-8'))
+
+
+
+#msg.attach(MIMEText('<html><body><h1>Hello</h1>' +'<img src="cid:0"><img src="cid:1"><img src="cid:2"><img src="cid:3">' +email_content, 'html', 'utf-8'))
+
+
 
 email_conn = smtplib.SMTP('smtp.gmail.com',587)
 email_conn.ehlo()
