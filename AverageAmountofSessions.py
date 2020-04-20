@@ -370,5 +370,5 @@ email_conn = smtplib.SMTP('smtp.gmail.com',587)
 email_conn.ehlo()
 email_conn.starttls() #encrypts password, needed for many connections
 email_conn.login('garrettmarkscott@gmail.com','mxqhsvwhlwzislxt') #need to generate app password from google
-email_conn.sendmail(e_user,'garrettpythontest@gmail.com', msg.as_string())
+email_conn.sendmail(e_user,['troyspring@mydealerworld.com','garrettpythontest@gmail.com','performance@mydealerworld.com'], msg.as_string())
 email_conn.quit()
