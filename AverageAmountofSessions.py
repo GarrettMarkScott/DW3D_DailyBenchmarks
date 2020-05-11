@@ -253,7 +253,7 @@ plt.cla()
 
 ##################### READ AND PLOT GOOGLE ADS PERFORMANCE #####################
 SQL = """
-    SELECT accounts.DealerName, perf.PerformanceScore, perf.`Real CTR` as SearchAdCTR
+    SELECT accounts.DealerName, perf.PerformanceScore, perf.`Search Ad CTR` as SearchAdCTR
     FROM `data_5d67cfa96d8c0`.`Account Performance:99` AS perf
     JOIN `data_5d67cfa96d8c0`.`Client Accounts (22)` AS accounts ON perf.DealerId = accounts.DealerID
     """
@@ -370,5 +370,5 @@ email_conn = smtplib.SMTP('smtp.gmail.com',587)
 email_conn.ehlo()
 email_conn.starttls() #encrypts password, needed for many connections
 email_conn.login('garrettmarkscott@gmail.com','mxqhsvwhlwzislxt') #need to generate app password from google
-email_conn.sendmail(e_user,['troyspring@mydealerworld.com','garrettpythontest@gmail.com','performance@mydealerworld.com'], msg.as_string())
+email_conn.sendmail(e_user,['troyspring@mydealerworld.com','garrettscott@mydealerworld.com','performance@mydealerworld.com'], msg.as_string())
 email_conn.quit()
