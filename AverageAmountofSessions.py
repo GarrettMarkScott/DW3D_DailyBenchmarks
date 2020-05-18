@@ -253,9 +253,11 @@ plt.cla()
 
 ##################### READ AND PLOT GOOGLE ADS PERFORMANCE #####################
 SQL = """
-    SELECT accounts.DealerName, perf.PerformanceScore, perf.`Search Ad CTR` as SearchAdCTR
-    FROM `data_5d67cfa96d8c0`.`Account Performance:99 - Don't Modify` AS perf
-    JOIN `data_5d67cfa96d8c0`.`Client Accounts (22)` AS accounts ON perf.DealerId = accounts.DealerID
+    SELECT
+        perf.DealerName,
+        perf.PerformanceScore,
+        perf.`Search Ad CTR` as SearchAdCTR
+    FROM `data_5d67cfa96d8c0`.`Account Performance - Don't Modify:99` AS perf
     """
 
 df = pd.read_sql_query(SQL, engine)
