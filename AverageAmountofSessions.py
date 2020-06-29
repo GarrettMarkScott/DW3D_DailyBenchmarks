@@ -340,9 +340,11 @@ aquire the json creds. Don't forget to 'enable' google sheets and/or google driv
 You will then need to add the email in the json key to the gsheet with edit permissions.
 """
 
-credentials = ServiceAccountCredentials.from_json_keyfile_name('PersonalGoogleDriveAPICreds.json', scope)
+#Location is explicitly set so that CRON job can be run from the root directory
+google_api = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'PersonalGoogleDriveAPICreds.json')
+credentials = ServiceAccountCredentials.from_json_keyfile_name(google_api, scope)
 
-gc = pygsheets.authorize(service_file='PersonalGoogleDriveAPICreds.json')
+gc = pygsheets.authorize(service_file=google_api)
 
 ######################### Begin Processing ####################################
 
