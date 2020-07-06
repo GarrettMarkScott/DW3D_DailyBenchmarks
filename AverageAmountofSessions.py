@@ -26,14 +26,14 @@ SQL = '''
     	Sessions.DealerName,
         Sessions.`date`,
         SUM(Sessions.Sessions) AS `Sessions`,
-        TotalUniqueGoals.TotalUniqueGoals,
+        COALESCE(FormTotals.TotalForms,0) + COALESCE(CallTotals.TotalCalls,0) + COALESCE(ChatTotals.TotalChats,0) AS `ConversationalConversions`,
         FormTotals.TotalForms,
         CallTotals.TotalCalls,
         ChatTotals.TotalChats,
+        (COALESCE(FormTotals.TotalForms,0) + COALESCE(CallTotals.TotalCalls,0) + COALESCE(ChatTotals.TotalChats,0) )/SUM(Sessions.Sessions) AS `TotalConversionRate`,
         FormTotals.TotalForms/SUM(Sessions.Sessions) AS `FormConversionRate`,
         CallTotals.TotalCalls/SUM(Sessions.Sessions) AS `CallConversionRate`,
-        ChatTotals.TotalChats/SUM(Sessions.Sessions) AS `ChatConversionRate`,
-        TotalUniqueGoals.TotalUniqueGoals/SUM(Sessions.Sessions) AS `TotalConversionRate`
+        ChatTotals.TotalChats/SUM(Sessions.Sessions) AS `ChatConversionRate`
 
     FROM data_5d67cfa96d8c0.`GA User Metrics (65)` as Sessions
 
@@ -63,17 +63,6 @@ SQL = '''
     	GROUP BY events.DealerName, events.`date`) AS CallTotals
     ON CallTotals.DealerID = Sessions.DealerID AND CallTotals.EventDay = Sessions.`Date`
 
-    LEFT JOIN (
-    	SELECT
-    		events.DealerID,
-    		events.DealerName,
-    		SUM(events.`Unique Events`) as TotalUniqueGoals,
-    		events.`date` as EventDay
-    	FROM data_5d67cfa96d8c0.`GA Events (64)` AS events
-    		WHERE events.TrackedItemName IS NOT NULL
-    		/* AND events.`date` > 20200301 */
-    	GROUP BY events.DealerName, events.`date`) AS TotalUniqueGoals
-    ON TotalUniqueGoals.DealerID = Sessions.DealerID AND TotalUniqueGoals.EventDay = Sessions.`Date`
 
     LEFT JOIN (
     	SELECT
@@ -283,7 +272,7 @@ SQL = '''
         leads.DealerName,
         leads.`Date`,
         leads.Sessions,
-        leads.TotalUniqueGoals,
+        leads.ConversationalConversions,
         leads.TotalForms,
         leads.TotalCalls,
         leads.TotalChats,
@@ -376,21 +365,21 @@ def CalculateZScores(IntervalLengths):
         """
 
         # You'll notice with the way that the code works this report can be ran with different intervals.
-        DealerLeads_SelectedInterval = df_valid[SelectedInterval].groupby('DealerName')[['TotalUniqueGoals','TotalForms','TotalCalls','TotalChats']].sum()
-        DealerLeads_PrevPeriod = df_valid[PreviousPeriod].groupby('DealerName')[['TotalUniqueGoals','TotalForms','TotalCalls','TotalChats']].sum()
+        DealerLeads_SelectedInterval = df_valid[SelectedInterval].groupby('DealerName')[['ConversationalConversions','TotalForms','TotalCalls','TotalChats']].sum()
+        DealerLeads_PrevPeriod = df_valid[PreviousPeriod].groupby('DealerName')[['ConversationalConversions','TotalForms','TotalCalls','TotalChats']].sum()
 
         #Renaming the columns since both dataFrames have the same column titles
-        DealerLeads_PrevPeriod.columns = ['TotalUniqueGoals_prev','TotalForms_prev','TotalCalls_prev','TotalChats_prev']
+        DealerLeads_PrevPeriod.columns = ['ConversationalConversions_prev','TotalForms_prev','TotalCalls_prev','TotalChats_prev']
 
 
         #Merging the two dataFrames
         df_merged = pd.merge(DealerLeads_SelectedInterval, DealerLeads_PrevPeriod, on='DealerName')
 
         #Calculating the percentage difference
-        df_merged['Calculated Diff'] = (df_merged.TotalUniqueGoals - df_merged.TotalUniqueGoals_prev) / df_merged.TotalUniqueGoals_prev
+        df_merged['Calculated Diff'] = (df_merged.ConversationalConversions - df_merged.ConversationalConversions_prev) / df_merged.ConversationalConversions_prev
 
         #Reducing to needed columns and sorting Values
-        df_merged = df_merged[['TotalUniqueGoals','TotalUniqueGoals_prev','Calculated Diff']].sort_values(by=['Calculated Diff'], ascending=False)
+        df_merged = df_merged[['ConversationalConversions','ConversationalConversions_prev','Calculated Diff']].sort_values(by=['Calculated Diff'], ascending=False)
 
         #Replacing infinite values from bad data
         df_merged.replace([np.inf, -np.inf], np.nan, inplace=True)
