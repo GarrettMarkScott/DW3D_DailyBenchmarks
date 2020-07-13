@@ -397,7 +397,7 @@ def CalculateZScores(IntervalLengths):
         of the performance managers. The code below joins the names back.
         """
         df_final = pd.merge(df_merged, df[['DealerName','FullName']].drop_duplicates(), on='DealerName', how='inner')
-
+        df_final = df_final[df_final['ConversationalConversions_prev'] > 0]
 
 
         #This provides the image urls to be placed in our googlesheet for the thumbnails
@@ -415,7 +415,7 @@ def CalculateZScores(IntervalLengths):
 
         #Remaing columns again to make prettier for end users
         #Note that we change the percentage float to a string with % character
-        df_final.columns = ['Dealer Name','Leads','Leads (Previous Period)','Calculated Diff','Z Score','PM']
+        df_final.columns = ['Dealer Name','Web Leads','Web Leads (Previous Period)','Calculated Diff','Z Score','PM']
         df_final['Calculated Diff'] = df_final['Calculated Diff'].map(lambda n: '{:,.2%}'.format(n))
 
         print('There are '+str(df_final.count())+' records in this dataFrame')
